@@ -55,13 +55,13 @@ If all arguments are strings and or bytes, `bytes.concat()` should be used inste
 <details><summary>2 Found Instances</summary>
 
 
-- Found in src/PuppyRaffle.sol [Line: 263](src/PuppyRaffle.sol#L263)
+- Found in src/PuppyRaffle.sol [Line: 267](src/PuppyRaffle.sol#L267)
 
 	```solidity
 	            abi.encodePacked(
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 267](src/PuppyRaffle.sol#L267)
+- Found in src/PuppyRaffle.sol [Line: 271](src/PuppyRaffle.sol#L271)
 
 	```solidity
 	                        abi.encodePacked(
@@ -80,13 +80,13 @@ Contracts have owners with privileged rights to perform admin tasks and need to 
 <details><summary>2 Found Instances</summary>
 
 
-- Found in src/PuppyRaffle.sol [Line: 21](src/PuppyRaffle.sol#L21)
+- Found in src/PuppyRaffle.sol [Line: 22](src/PuppyRaffle.sol#L22)
 
 	```solidity
 	contract PuppyRaffle is ERC721, Ownable {
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 227](src/PuppyRaffle.sol#L227)
+- Found in src/PuppyRaffle.sol [Line: 231](src/PuppyRaffle.sol#L231)
 
 	```solidity
 	    function changeFeeAddress(address newFeeAddress) external onlyOwner {
@@ -120,13 +120,13 @@ Check for `address(0)` when assigning values to address state variables.
 <details><summary>2 Found Instances</summary>
 
 
-- Found in src/PuppyRaffle.sol [Line: 79](src/PuppyRaffle.sol#L79)
+- Found in src/PuppyRaffle.sol [Line: 80](src/PuppyRaffle.sol#L80)
 
 	```solidity
 	        feeAddress = _feeAddress;
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 228](src/PuppyRaffle.sol#L228)
+- Found in src/PuppyRaffle.sol [Line: 232](src/PuppyRaffle.sol#L232)
 
 	```solidity
 	        feeAddress = newFeeAddress;
@@ -143,7 +143,7 @@ Instead of marking a function as `public`, consider marking it as `external` if 
 <details><summary>3 Found Instances</summary>
 
 
-- Found in src/PuppyRaffle.sol [Line: 102](src/PuppyRaffle.sol#L102)
+- Found in src/PuppyRaffle.sol [Line: 103](src/PuppyRaffle.sol#L103)
 
 	```solidity
 	    function enterRaffle(address[] memory newPlayers) public payable {
@@ -155,7 +155,7 @@ Instead of marking a function as `public`, consider marking it as `external` if 
 	    function refund(uint256 playerIndex) public {
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 255](src/PuppyRaffle.sol#L255)
+- Found in src/PuppyRaffle.sol [Line: 259](src/PuppyRaffle.sol#L259)
 
 	```solidity
 	    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
@@ -172,19 +172,19 @@ If the same constant literal value is used multiple times, create a constant sta
 <details><summary>3 Found Instances</summary>
 
 
-- Found in src/PuppyRaffle.sol [Line: 179](src/PuppyRaffle.sol#L179)
+- Found in src/PuppyRaffle.sol [Line: 176](src/PuppyRaffle.sol#L176)
 
 	```solidity
 	        uint256 prizePool = (totalAmountCollected * 80) / 100;
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 180](src/PuppyRaffle.sol#L180)
+- Found in src/PuppyRaffle.sol [Line: 177](src/PuppyRaffle.sol#L177)
 
 	```solidity
 	        uint256 fee = (totalAmountCollected * 20) / 100;
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 192](src/PuppyRaffle.sol#L192)
+- Found in src/PuppyRaffle.sol [Line: 190](src/PuppyRaffle.sol#L190)
 
 	```solidity
 	        uint256 rarity = uint256(keccak256(abi.encodePacked(msg.sender, block.difficulty))) % 100;
@@ -201,19 +201,19 @@ Index event fields make the field more quickly accessible to off-chain tools tha
 <details><summary>3 Found Instances</summary>
 
 
-- Found in src/PuppyRaffle.sol [Line: 66](src/PuppyRaffle.sol#L66)
+- Found in src/PuppyRaffle.sol [Line: 67](src/PuppyRaffle.sol#L67)
 
 	```solidity
 	    event RaffleEnter(address[] newPlayers); // @audit-q should whole array be published as an event?
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 67](src/PuppyRaffle.sol#L67)
+- Found in src/PuppyRaffle.sol [Line: 68](src/PuppyRaffle.sol#L68)
 
 	```solidity
 	    event RaffleRefunded(address player);
 	```
 
-- Found in src/PuppyRaffle.sol [Line: 68](src/PuppyRaffle.sol#L68)
+- Found in src/PuppyRaffle.sol [Line: 69](src/PuppyRaffle.sol#L69)
 
 	```solidity
 	    event FeeAddressChanged(address newFeeAddress);

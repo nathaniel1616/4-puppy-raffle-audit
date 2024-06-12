@@ -107,8 +107,7 @@ contract PuppyRaffle is ERC721, Ownable {
         }
 
         // Check for duplicates
-        // @audit-q should this be a separate function to make it more modular?
-        // @audit-q can the loop cause an infinite loop? can mapping be a better data structure?
+        // @audit DoS
 
         for (uint256 i = 0; i < players.length - 1; i++) {
             for (uint256 j = i + 1; j < players.length; j++) {
@@ -128,9 +127,6 @@ contract PuppyRaffle is ERC721, Ownable {
         address playerAddress = players[playerIndex];
         require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
         require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
-        // @audit-q should we send the value using the call function?
-        // @audit-q should we send the value before deleting the player?
-        // @audit-q does this follow the CEI pattern?
         // @audit-finding   rentracy
         payable(msg.sender).sendValue(entranceFee);
 
@@ -169,7 +165,6 @@ contract PuppyRaffle is ERC721, Ownable {
         // @audit-q should we use a require statement to check if the players array is empty?
 
         require(players.length >= 4, "PuppyRaffle: Need at least 4 players");
-        // @audit-q Can this be truely random?
         // @audit-q can the winner be manipulated?should we use an oracle to get a random number? eg Chainlink VRF or Commit
         // @audit-finding Weak RNG
         uint256 winnerIndex =
@@ -204,6 +199,8 @@ contract PuppyRaffle is ERC721, Ownable {
         delete players;
         raffleStartTime = block.timestamp;
         previousWinner = winner;
+        // @audit-q a possible Reentrancy
+        // the winner wouldnt get  the money if their fallback was messed up
         (bool success,) = winner.call{value: prizePool}("");
         require(success, "PuppyRaffle: Failed to send prize pool to winner");
         _safeMint(winner, tokenId);
@@ -218,9 +215,13 @@ contract PuppyRaffle is ERC721, Ownable {
         // @audit-q  should any address to call this contract?
         // @audit-q  can withdrawl be called only after the raffle is over?
         // @audit-q  should  withdrawl be called inside the selectWinner function? Making it internal function
+
+        // @audit-finding Mishandling of Eth
         require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
         uint256 feesToWithdraw = totalFees;
         totalFees = 0;
+        // @audit-q what if the feeAddress is a smart contract with a affallaback that will fail?
+        //slither-disable-next-line arbitrary-send-eth
         (bool success,) = feeAddress.call{value: feesToWithdraw}("");
         require(success, "PuppyRaffle: Failed to withdraw fees");
     }

@@ -314,4 +314,62 @@ contract PuppyRaffleTest is Test {
 
         //
     }
+
+    function test_AuditCannotSelectWinnerAfterSomeRefunds() public playersEntered {
+        // four players have already entered the raffle , check the modifier in this function
+        //  two  new players enter and two players will be refunded
+        address playerFive = makeAddr("5");
+        address playerSix = makeAddr("6");
+        address[] memory newplayers = new address[](2);
+        newplayers[0] = playerFive;
+        newplayers[1] = playerSix;
+        puppyRaffle.enterRaffle{value: entranceFee * 2}(newplayers);
+        console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
+
+        vm.startPrank(playerSix);
+        puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerSix));
+        console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
+        vm.stopPrank();
+
+        vm.startPrank(playerFive);
+        puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerFive));
+        console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
+        vm.stopPrank();
+
+        uint256 balanceBefore = address(playerFour).balance;
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+
+        uint256 expectedPayout = ((entranceFee * 4) * 80 / 100);
+        vm.expectRevert();
+        puppyRaffle.selectWinner();
+        // assertEq(address(playerFour).balance, balanceBefore + expectedPayout);
+    }
+
+    function test_AuditCannotSelectWinnerAfterExpectedWinnerHasGottenARefund() public playersEntered {
+        // four players have already entered the raffle , check the modifier in this function
+        //  two  new players enter
+        // Due to weak RNG , we always know that the expected winner is player 4 , so will call a refund on player 4,
+        // this means that even if the weak RNG has been solved , when a random winner is selected but the winner has gotten
+        //  has a refund and does not stand a chance of winning  , the contract will fail to select the winner who are still in the raffle
+
+        address playerFive = makeAddr("5");
+        address playerSix = makeAddr("6");
+        address[] memory newplayers = new address[](2);
+        newplayers[0] = playerFive;
+        newplayers[1] = playerSix;
+        puppyRaffle.enterRaffle{value: entranceFee * 2}(newplayers);
+        console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
+
+        vm.startPrank(playerFour);
+        puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerFour));
+        console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+
+        vm.expectRevert();
+        puppyRaffle.selectWinner();
+    }
 }
