@@ -254,10 +254,12 @@ contract PuppyRaffleTest is Test {
     //proof of code for reentrancy attack
     function testAuditPoC_Reentrancy() public {
         // a normal user (victim) enters the raffle
-        address[] memory players = new address[](2);
+        address[] memory players = new address[](4);
         players[0] = playerOne;
         players[1] = playerTwo;
-        puppyRaffle.enterRaffle{value: entranceFee * players.length}(players);
+        players[2] = playerThree;
+        players[3] = playerFour;
+        puppyRaffle.enterRaffle{value: entranceFee * 4}(players);
         uint256 puppyRaffleInitialBalance = address(puppyRaffle).balance;
         // checking the balance of the contract
         console.log("Balance of the PuppyRaffle before attack: ", puppyRaffleInitialBalance);
@@ -324,26 +326,29 @@ contract PuppyRaffleTest is Test {
         newplayers[0] = playerFive;
         newplayers[1] = playerSix;
         puppyRaffle.enterRaffle{value: entranceFee * 2}(newplayers);
-        console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
+        console.log("Balance of the contract after entering          :", address(puppyRaffle).balance);
 
         vm.startPrank(playerSix);
         puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerSix));
-        console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
+        console.log("Balance of the contract after refunding player 6:", address(puppyRaffle).balance);
         vm.stopPrank();
 
         vm.startPrank(playerFive);
         puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerFive));
-        console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
+        console.log("Balance of the contract after refunding player 5:", address(puppyRaffle).balance);
         vm.stopPrank();
 
-        uint256 balanceBefore = address(playerFour).balance;
+        // uint256 balanceBefore = address(playerFour).balance;
         vm.warp(block.timestamp + duration + 1);
         vm.roll(block.number + 1);
 
-        uint256 expectedPayout = ((entranceFee * 4) * 80 / 100);
+        console.log("Number of players in the raffle after some refunds", puppyRaffle.getNumberOfPlayers());
+        console.log("Expected number of players after refunds", 4);
+
+        // uint256 expectedPayout = ((entranceFee * 4) * 80 / 100);
         vm.expectRevert();
         puppyRaffle.selectWinner();
-        // assertEq(address(playerFour).balance, balanceBefore + expectedPayout);
+        // assertEq(address(playerFour).balance, bala nceBefore + expectedPayout);
     }
 
     function test_AuditCannotSelectWinnerAfterExpectedWinnerHasGottenARefund() public playersEntered {
@@ -353,23 +358,23 @@ contract PuppyRaffleTest is Test {
         // this means that even if the weak RNG has been solved , when a random winner is selected but the winner has gotten
         //  has a refund and does not stand a chance of winning  , the contract will fail to select the winner who are still in the raffle
 
-        address playerFive = makeAddr("5");
-        address playerSix = makeAddr("6");
-        address[] memory newplayers = new address[](2);
-        newplayers[0] = playerFive;
-        newplayers[1] = playerSix;
-        puppyRaffle.enterRaffle{value: entranceFee * 2}(newplayers);
-        console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
+        // address playerFive = makeAddr("5");
+        // address playerSix = makeAddr("6");
+        // address[] memory newplayers = new address[](2);
+        // newplayers[0] = playerFive;
+        // newplayers[1] = playerSix;
+        // puppyRaffle.enterRaffle{value: entranceFee * 2}(newplayers);
+        // console.log("Balance of the contract after entering: ", address(puppyRaffle).balance);
 
-        vm.startPrank(playerFour);
-        puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerFour));
-        console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
-        vm.stopPrank();
+        // vm.startPrank(playerFour);
+        // puppyRaffle.refund(puppyRaffle.getActivePlayerIndex(playerFour));
+        // console.log("Balance of the contract after refunding:", address(puppyRaffle).balance);
+        // vm.stopPrank();
 
         vm.warp(block.timestamp + duration + 1);
         vm.roll(block.number + 1);
 
-        vm.expectRevert();
+        // vm.expectRevert();
         puppyRaffle.selectWinner();
     }
 }

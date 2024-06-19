@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
-// @audit-q is this the right solidity version? Does it have any security vulnerabilities?
-// @audit-q  should be be worried about overflow in solidity version  less than 0.8.0?
-// @audit-q  should the get a specific version of solidity?
+
+// @report-written
 pragma solidity ^0.7.6;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -31,7 +30,8 @@ contract PuppyRaffle is ERC721, Ownable {
     ////////////////////////////////////////////////////////////////////
     uint256 public immutable entranceFee;
 
-    address[] public players; // @audit-q should this array be public? NO a private array would be better for gas
+    address[] public players; // @report-written should this array be public? NO a private array would be better for gas
+    // report-written should be a
     uint256 public raffleDuration;
     uint256 public raffleStartTime;
     address public previousWinner;
@@ -46,16 +46,19 @@ contract PuppyRaffle is ERC721, Ownable {
     mapping(uint256 => string) public rarityToName;
 
     // Stats for the common puppy (pug)
+    // @report-written should be constant
     string private commonImageUri = "ipfs://QmSsYRx3LpDAb1GZQm7zZ1AuHZjfbPkD6J7s9r41xu1mf8";
     uint256 public constant COMMON_RARITY = 70;
     string private constant COMMON = "common";
 
     // Stats for the rare puppy (st. bernard)
+    // @report-written should be constant
     string private rareImageUri = "ipfs://QmUPjADFGEKmfohdTaNcWhp7VGk26h5jXDA7v3VtTnTLcW";
     uint256 public constant RARE_RARITY = 25;
     string private constant RARE = "rare";
 
     // Stats for the legendary puppy (shiba inu)
+    // @report-written should be constant
     string private legendaryImageUri = "ipfs://QmYx6GsYAKnNzZ9A6NvEKV9nf1VaDzJrqDR23Y8YSkebLU";
     uint256 public constant LEGENDARY_RARITY = 5;
     string private constant LEGENDARY = "legendary";
@@ -64,7 +67,7 @@ contract PuppyRaffle is ERC721, Ownable {
     //                         EVENTS                                 //
     ////////////////////////////////////////////////////////////////////
     // Events
-    event RaffleEnter(address[] newPlayers); // @audit-q should whole array be published as an event?
+    event RaffleEnter(address[] newPlayers);
     event RaffleRefunded(address player);
     event FeeAddressChanged(address newFeeAddress);
 
@@ -98,8 +101,7 @@ contract PuppyRaffle is ERC721, Ownable {
     /// @notice they have to pay the entrance fee * the number of players
     /// @notice duplicate entrants are not allowed
     /// @param newPlayers the list of players to enter the raffle
-    // @audit-q should this function be public and not external?
-    // @audit-q should the parameter be an array of addresses and not a single address?
+    // @report-written should this function be public and not external?
     function enterRaffle(address[] memory newPlayers) public payable {
         require(msg.value == entranceFee * newPlayers.length, "PuppyRaffle: Must send enough to enter raffle");
         for (uint256 i = 0; i < newPlayers.length; i++) {
@@ -107,8 +109,8 @@ contract PuppyRaffle is ERC721, Ownable {
         }
 
         // Check for duplicates
-        // @audit DoS
-
+        // @report-written DoS
+        //  @report-written uint256 playersLength = players.length;
         for (uint256 i = 0; i < players.length - 1; i++) {
             for (uint256 j = i + 1; j < players.length; j++) {
                 require(players[i] != players[j], "PuppyRaffle: Duplicate player");
@@ -119,17 +121,13 @@ contract PuppyRaffle is ERC721, Ownable {
 
     /// @param playerIndex the index of the player to refund. You can find it externally by calling `getActivePlayerIndex`
     /// @dev This function will allow there to be blank spots in the array
-    //@audit-q should this function be public and not external?
-    //@audit-q can EOA and Contract account call this function
-    // @audit-q can a user get a refund at the same time as the winner is selected? is there a time lock on receiving a refund?
     function refund(uint256 playerIndex) public {
         // @audit-q  Can this cause an MEV
         address playerAddress = players[playerIndex];
         require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
         require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
-        // @audit-finding   rentracy
+        // @report-written  rentracy
         payable(msg.sender).sendValue(entranceFee);
-
         players[playerIndex] = address(0);
         emit RaffleRefunded(playerAddress);
     }
@@ -147,8 +145,8 @@ contract PuppyRaffle is ERC721, Ownable {
                 return i;
             }
         }
-        // @audit-q what if an active player is at index 0?
-        // @audit-finding
+
+        // @report-written
         return 0;
     }
 
@@ -158,35 +156,28 @@ contract PuppyRaffle is ERC721, Ownable {
     /// @dev we use a hash of on-chain data to generate the random numbers
     /// @dev we reset the active players array after the winner is selected
     /// @dev we send 80% of the funds to the winner, the other 20% goes to the feeAddress
-    //  @audit-q should this function be automatically called after the raffle duration?
 
     function selectWinner() external {
         require(block.timestamp >= raffleStartTime + raffleDuration, "PuppyRaffle: Raffle not over");
-        // @audit-q should we use a require statement to check if the players array is empty?
 
         require(players.length >= 4, "PuppyRaffle: Need at least 4 players");
-        // @audit-q can the winner be manipulated?should we use an oracle to get a random number? eg Chainlink VRF or Commit
-        // @audit-finding Weak RNG
+        // @report-written Weak RNG
         uint256 winnerIndex =
             uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length;
         address winner = players[winnerIndex];
-        // @audit-q would totalAmountCollected be calculated with the entranceFee * players length?
-        // @audit-q what if there haave been refunds , would the totalAmountCollected be correct? check the refund logic and natspec
+        // @report-written what if there haave been refunds , would the totalAmountCollected be correct? check the refund logic and natspec
         uint256 totalAmountCollected = players.length * entranceFee;
+        // @report-written info use Magic Number
         uint256 prizePool = (totalAmountCollected * 80) / 100;
         uint256 fee = (totalAmountCollected * 20) / 100;
-        // @audit-q should we use SafeMath here?
-        // @audit-q can typecasting uint256 to uint64 cause any issues?
-        // @audit-q when fee is greater than uint64, what happens?
-        // @audit-qdev why was uint64 used here?
-        // @audit-finding Precision los
+        // @report-written Precision los
         totalFees = totalFees + uint64(fee);
 
         // @audit-q should we maintain a local balances tokenid supply?
         uint256 tokenId = totalSupply();
 
         // We use a different RNG calculate from the winnerIndex to determine rarity
-        // @audit-q can this random number  be manipulated?
+        // @report-written can this random number  be manipulated?
         uint256 rarity = uint256(keccak256(abi.encodePacked(msg.sender, block.difficulty))) % 100;
         if (rarity <= COMMON_RARITY) {
             tokenIdToRarity[tokenId] = COMMON_RARITY;
@@ -238,8 +229,7 @@ contract PuppyRaffle is ERC721, Ownable {
     ///////////////////////////////////////////////////////////////////
 
     /// @notice this function will return true if the msg.sender is an active player
-    // @audit-q should this function be public and not internal?
-    // @audit-q should this function be removed as it has not used in the code?
+    // @audit-finding Remove unused this code
     function _isActivePlayer() internal view returns (bool) {
         for (uint256 i = 0; i < players.length; i++) {
             if (players[i] == msg.sender) {
@@ -282,5 +272,14 @@ contract PuppyRaffle is ERC721, Ownable {
                 )
             )
         );
+    }
+
+    ///////////////////////////////////////////////////////////////////
+    //                 AUDIT GETTER  FUNCTIONS                       //
+    ///////////////////////////////////////////////////////////////////
+
+    //get the length of player array
+    function getNumberOfPlayers() public view returns (uint256) {
+        return players.length;
     }
 }
