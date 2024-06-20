@@ -172,8 +172,6 @@ contract PuppyRaffle is ERC721, Ownable {
         uint256 fee = (totalAmountCollected * 20) / 100;
         // @report-written Precision los
         totalFees = totalFees + uint64(fee);
-
-        // @audit-q should we maintain a local balances tokenid supply?
         uint256 tokenId = totalSupply();
 
         // We use a different RNG calculate from the winnerIndex to determine rarity
@@ -191,23 +189,16 @@ contract PuppyRaffle is ERC721, Ownable {
         raffleStartTime = block.timestamp;
         previousWinner = winner;
         // @audit-q a possible Reentrancy
-        // the winner wouldnt get  the money if their fallback was messed up
+        // the winner wouldnt get  the money if their fallback was messed up / a pull of funds rather than a push to the winner
         (bool success,) = winner.call{value: prizePool}("");
         require(success, "PuppyRaffle: Failed to send prize pool to winner");
         _safeMint(winner, tokenId);
     }
 
     /// @notice this function will withdraw the fees to the feeAddress
-    // @audit-q can this function be parameterized? eg withdrawFees(uint256 amount)
     function withdrawFees() external {
-        // @audit-q  what if the totalFees is not equal to the balance of the contract?
-        // @audit-q   can withdrawl fees be locked down when the raffle is active?
-        // @audit-q   can anyone call this function? should it be only the owner?
-        // @audit-q  should any address to call this contract?
-        // @audit-q  can withdrawl be called only after the raffle is over?
-        // @audit-q  should  withdrawl be called inside the selectWinner function? Making it internal function
-
-        // @audit-finding Mishandling of Eth
+        // @report-written  access control, should be onlyOwner modifier
+        // @audit-finding Mishandling of Eth , how about implementing a pull of funds by user instead of pushing it to the user
         require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
         uint256 feesToWithdraw = totalFees;
         totalFees = 0;
@@ -229,7 +220,7 @@ contract PuppyRaffle is ERC721, Ownable {
     ///////////////////////////////////////////////////////////////////
 
     /// @notice this function will return true if the msg.sender is an active player
-    // @audit-finding Remove unused this code
+    // @report-written Remove unused this code
     function _isActivePlayer() internal view returns (bool) {
         for (uint256 i = 0; i < players.length; i++) {
             if (players[i] == msg.sender) {

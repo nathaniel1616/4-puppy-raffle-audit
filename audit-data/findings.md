@@ -290,7 +290,34 @@ for (uint256 i = 0; i < players.length - 1; i++) {
 }
 ```
 
+### [M-2] `PuppyRaffle::withdraw` function should be callable by anyone which is lead manipulation by others
 
+**Description:**  `PuppyRaffle::withdrawal ` function should be callable by anyone which is lead manipulation by others , for instance 
+the fee address set by  the owner will might not unable to accept eth/is a wrong address . An attacker will call this function to send out the fees
+
+**Impact:** Anyone can call the `PuppyRaffle::withdraw` function to send out the fees which is only intended by the owner 
+
+
+**Recommended Mitigation:** Add the onlyOwner modifier to the `PuppyRaffle::withdraw` function
+```diff
+-    function withdrawFees() external {
++    function withdrawFees() external onlyOwner {
+```
+
+
+### [M-3] Mishandling of Eth in `PuppyRaffle::withdraw` function causing the owner unable to withdraw fees after raffle
+
+**Description:** The logic inside the `PuppyRaffle::withdraw` function strictly checks that the totalFees should be always equal to the balance of the contract.
+```javascript
+ require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
+```
+With this assertion , a malicious users can push forcily push eth into the contract using self destruct , this will raise the balance of the contract to be greater than the fees , breaking the protocol
+
+**Impact:**  The owner will be unable to withdraw the fees even after the raffle.
+
+**Proof of Concept:**
+
+**Recommended Mitigation:** 
 
 
 
@@ -306,8 +333,6 @@ for (uint256 i = 0; i < players.length - 1; i++) {
                 return i;
             }
         }
-        // @audit-q what if an active player is at index 0?
-        // @audit-finding
         return 0;
     }
 ```
@@ -502,6 +527,22 @@ function selectWinner() external {
       *** Code here ***
     }
 
+```
+### [I-#] Unused `PuppyRaffle::_isActivePlayer` function  making the codebase unreadable
+
+**Description:** The internal `PuppyRaffle::_isActivePlayer` function was never called in any other  part of the `PuppyRaffle` contract
+
+
+**Recommended Mitigation:** Delete the whole function
+```diff
+-    function _isActivePlayer() internal view returns (bool) {
+-        for (uint256 i = 0; i < players.length; i++) {
+-            if (players[i] == msg.sender) {
+-                return true;
+-            }
+-        }
+-        return false;
+-    }
 ```
 
 
