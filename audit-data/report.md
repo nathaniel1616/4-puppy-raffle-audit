@@ -1,7 +1,7 @@
 ---
-title: PasswordStoreAudit Report
+title: PuppyRaffle Audit Report
 author: Nathaniel Yeboah
-date: June 9, 2024
+date: June 20, 2024
 header-includes:
   - \usepackage{titling}
   - \usepackage{graphicx}
@@ -14,7 +14,7 @@ header-includes:
         \includegraphics[width=0.5\textwidth]{logo.pdf} 
     \end{figure}
     \vspace*{2cm}
-    {\Huge\bfseries PasswordStore Audit Report\par}
+    {\Huge\bfseries PuppyRaffle Audit Report\par}
     \vspace{1cm}
     {\Large Version 1.0\par}
     \vspace{2cm}
@@ -45,8 +45,12 @@ Prepared by: Nathaniel Yeboah
 - [Findings](#findings)
 
 # Protocol Summary
-
-This is a password store contract where users can store their passwords. Only the owner can set the password and view the password . The contract emits an event when a password is set.
+This project allows users to enter a reaffle to win a cute dog NFT. The protocol should do the folllowing:
+1. player enters the raffle by calling the payable `enterRaffle` function . total entrance fee is based on the the basic entrance fee * the number of participants.
+2. Players can choose to get a refund by calling the `refund` function, which sends the entrance fee back to the player.
+3. A winner is selected after X amount of time and is minted a  puppy. The random selection is based on the hash of the block difficulty annd msg.sender address
+4.  The owner of the protocol will set a feeAddress to take a cut of the `value`, and the rest of the funds will be sent to the winner.
+5.  The owner can set the address of the feeAddress .
 
 # Disclaimer
 
@@ -67,7 +71,7 @@ We use the [CodeHawks](https://docs.codehawks.com/hawks-auditors/how-to-evaluate
 
 ** The findings described in this report are based on the code at the following commit hash: **
 ```
-Commit hash: 7d55682ddc4301a7b13ae9413095feffd9924566
+Commit hash: e30d199697bbc822b646d76533b66b7d529b8ef5
 
 ```
 
@@ -75,13 +79,13 @@ Commit hash: 7d55682ddc4301a7b13ae9413095feffd9924566
 ** The audit report is based on the following files: **
 
 ```
-src/PasswordStore.sol
+src/PuppyRaffle.sol
 ```
 
 ## Roles
 
-- **Owner:** The owner of the contract can set the password of the contract and view the password of the contract.
-- **Others:** No one else can set the password of the contract or view the password of the contract.
+- Players: Can enter the raffle and get a refund and stand a chance for winner the raffle 
+- Owner: Can set the feeAddress and withdraw fees  and deployer the raffle contract
   
 # Executive Summary
 
@@ -92,11 +96,13 @@ src/PasswordStore.sol
 ## Issues found
  | Severity | Number of issues found |
  | -------- | ---------------------- |
- | High     | 2                      |
- | Medium   | 0                      |
- | Low      | 0                      |
- | Info     | 1                      |
- | Total    | 3                      |
+ | High     | 5                      |
+ | Medium   | 4                      |
+ | Low      | 2                      |
+ | Info     | 5                      |
+ | Gas      | 3                      |
+ | Total    | 19                     |
+
 
 
 # Findings

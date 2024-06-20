@@ -203,7 +203,7 @@ function selectWinner() public {
 
 **Recommended Mitigation:** Use an orcle such as ChainLink VRF . The ChainLink Docs are available [here](https://docs.chain.link/vrf).
 
-### [S-#] Weak Random Number Generator(WRNG) in `puppyRaffle::selectWinner::rarity`
+### [H-5] Weak Random Number Generator(WRNG) in `puppyRaffle::selectWinner::rarity`
 
 **Description:** A keccak hash of msg.sender and block.difficulty doesnot generate a
 
@@ -315,9 +315,27 @@ With this assertion , a malicious users can push forcily push eth into the contr
 
 **Impact:**  The owner will be unable to withdraw the fees even after the raffle.
 
-**Proof of Concept:**
+**Recommended Mitigation:**  Remove the check from the code 
+```diff
+-    require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
+```
+
+### [M-4] Smart Contracts who might be winner of contract may not have a `fallback` or `receive` function  to receive eth  causing the `PuppyRaffle::selectWinner` function to revert leading to inability to reset the players and start a new raffle
+
+**Description:** The `PuppyRaffle::selectWinner` function is responsible for resetting the players and starting a new raffle. Howerver , if the winner of the raffle is a smart contract and rejects eth , the `PuppyRaffle::selectWinner` function will revert.Hence the raffle will not be able to restart
+
+**Impact:** Smart Contracts winners cannot receive funds , and `PuppyRaffle` contract cannot start a new raffle
+
+**Proof of Concept:** 
+1. if only smart contracts wallet enters the raffle  without a `fallback` or `receive` function
+2. the lottery ends 
+3. the `PuppyRaffle::selectWinner` function would not work as expected and the `PuppyRaffle` contract would not be able to start a new raffle
+   
 
 **Recommended Mitigation:** 
+1. Do not allow smart contracts to enter the raffle(not recommended)
+2. Create a mapping of address to payout , so that winners can pull their funds out themselves with a new `claimPrize` function	, putting the ownes on the wineer to claim their prize (recommended)
+3. this is a pull over push preferences 
 
 
 
@@ -380,51 +398,11 @@ Also should change the `PuppyRaffle::getActivePlayerIndex` to return -1 if the p
 **Recommended Mitigation:**  Use a specfic and stable version   of solidity preferrably version 0.8.0 . More [Info on Slither Documentation](https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity) 
 
 
-# Gas
 
-### [G-#]  ```PuppyRaffle::players``` Public Arrays Variable Should be Set to Private Arrary To Save Gas
-
-**Description:** It consumes gas to set an array variable public.
-
-**Impact:** 
-
-**Proof of Concept:**
-
-**Recommended Mitigation:**  You should set the variable to private and use a getter function to access the index of array
-```diff
-- address[] public players;
-+ address[] private players;
-
-+  function getPlayers(uint256 index) public view returns (address) {
-+    players[index];
-+  }
-
-
-```
-
-### [G-#] Unchanged State Variables in the  should be set to immutable or constant to save gas.
-
-Reading from stroage is much more expensive than reading from a constant or immutable variable.
-
-Instances:
-- ```PuppyRaffle::raffleDuration``` should be `immutable`
-- ```PuppyRaffle::commonImageUri``` should be `constant`
-- ```PuppyRaffle::rareImageUri``` should be `constant`
-- ```PuppyRaffle::legendaryImageUri``` should be `constant`
-  
-
-
-
-**Recommended Mitigation:** 
-```diff
-- uint256 public raffleDuration;
-+ uint256 public immutable raffleDuration;
-
-```
 
 # Informational
 
-### [I-]: Missing checks for `address(0)` when assigning values to address state variables
+### [I-1]: Missing checks for `address(0)` when assigning values to address state variables
 
 Check for `address(0)` when assigning values to address state variables.
 
@@ -442,7 +420,7 @@ Check for `address(0)` when assigning values to address state variables.
 </details>
 
 
-### [I-#] The ```PuppyRaffle::enterRaffle```  and ```PuppyRaffle::refund``` function should marked as external and not public 
+### [I-2] The ```PuppyRaffle::enterRaffle```  and ```PuppyRaffle::refund``` function should marked as external and not public 
 
 **Description:**   ```PuppyRaffle::enterRaffle``` function was not used internally and should be marked as `external`
 
@@ -460,7 +438,7 @@ Check for `address(0)` when assigning values to address state variables.
 ```
 
 
-### [S-#] `PuppyRaffle::selectWinner` does not follow CEI, which is not the best practice
+### [I-3] `PuppyRaffle::selectWinner` does not follow CEI, which is not the best practice
 
 **Recommended Mitigation:** 
 ```diff
@@ -474,27 +452,9 @@ Check for `address(0)` when assigning values to address state variables.
 
 
 
-### [G-#] ```PuppyRaffle::players.length ``` in ```PuppyRaffle::enterRaffle``` function  should use cached array length instead of referencing `length` member of the storage array.
 
 
-
-**Recommended Mitigation:**
-```diff
-+  unit256 playersLength = players.length;
-
--  for (uint256 i = 0; i < players.length - 1; i++) {
--           for (uint256 j = i + 1; j < players.length; j++) {
-+  for (uint256 i = 0; i < playersLength  - 1; i++) {
-+           for (uint256 j = i + 1; j < playersLength ; j++) {
-              require(players[i] != players[j], "PuppyRaffle:        Duplicate player");
-           }
-       }
-
-```
-
-
-
-### [I-#] Should not Magic Numbers in ```PuppyRaffle``` contract be set to contacts
+### [I-4] Should not Magic Numbers in ```PuppyRaffle``` contract be set to contacts
 
 
 **Description:**  In ```PuppyRaffle::selectWinner``` function, magic numbers should not be used.
@@ -528,7 +488,7 @@ function selectWinner() external {
     }
 
 ```
-### [I-#] Unused `PuppyRaffle::_isActivePlayer` function  making the codebase unreadable
+### [I-5] Unused `PuppyRaffle::_isActivePlayer` function  making the codebase unreadable
 
 **Description:** The internal `PuppyRaffle::_isActivePlayer` function was never called in any other  part of the `PuppyRaffle` contract
 
@@ -545,15 +505,62 @@ function selectWinner() external {
 -    }
 ```
 
+# Gas
 
+### [G-1]  ```PuppyRaffle::players``` Public Arrays Variable Should be Set to Private Arrary To Save Gas
 
-
-### [S-#] TITLE (Root Cause + Impact)
-
-**Description:** 
+**Description:** It consumes gas to set an array variable public.
 
 **Impact:** 
 
 **Proof of Concept:**
 
+**Recommended Mitigation:**  You should set the variable to private and use a getter function to access the index of array
+```diff
+- address[] public players;
++ address[] private players;
+
++  function getPlayers(uint256 index) public view returns (address) {
++    players[index];
++  }
+
+
+```
+
+### [G-2] Unchanged State Variables in the  should be set to immutable or constant to save gas.
+
+Reading from stroage is much more expensive than reading from a constant or immutable variable.
+
+Instances:
+- ```PuppyRaffle::raffleDuration``` should be `immutable`
+- ```PuppyRaffle::commonImageUri``` should be `constant`
+- ```PuppyRaffle::rareImageUri``` should be `constant`
+- ```PuppyRaffle::legendaryImageUri``` should be `constant`
+  
+
+
+
 **Recommended Mitigation:** 
+```diff
+- uint256 public raffleDuration;
++ uint256 public immutable raffleDuration;
+
+```
+
+### [G-3] ```PuppyRaffle::players.length ``` in ```PuppyRaffle::enterRaffle``` function  should use cached array length instead of referencing `length` member of the storage array.
+
+
+
+**Recommended Mitigation:**
+```diff
++  unit256 playersLength = players.length;
+
+-  for (uint256 i = 0; i < players.length - 1; i++) {
+-           for (uint256 j = i + 1; j < players.length; j++) {
++  for (uint256 i = 0; i < playersLength  - 1; i++) {
++           for (uint256 j = i + 1; j < playersLength ; j++) {
+              require(players[i] != players[j], "PuppyRaffle:        Duplicate player");
+           }
+       }
+
+```

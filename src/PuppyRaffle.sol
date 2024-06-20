@@ -198,11 +198,11 @@ contract PuppyRaffle is ERC721, Ownable {
     /// @notice this function will withdraw the fees to the feeAddress
     function withdrawFees() external {
         // @report-written  access control, should be onlyOwner modifier
-        // @audit-finding Mishandling of Eth , how about implementing a pull of funds by user instead of pushing it to the user
+        // @report-written Mishandling of Eth , how about implementing a pull of funds by user instead of pushing it to the user
         require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
         uint256 feesToWithdraw = totalFees;
         totalFees = 0;
-        // @audit-q what if the feeAddress is a smart contract with a affallaback that will fail?
+        // @report  what if the feeAddress is a smart contract with a affallaback that will fail?
         //slither-disable-next-line arbitrary-send-eth
         (bool success,) = feeAddress.call{value: feesToWithdraw}("");
         require(success, "PuppyRaffle: Failed to withdraw fees");
