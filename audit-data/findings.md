@@ -28,7 +28,8 @@ Also there is no  reentrancy guard in the `PuppyRaffle::refund` function to prev
 **Recommended Mitigation:** here are a few recommendations
  1. Consider adding  Openzeppelin Reentancy guard  for the `PuppyRaffle` contract. Then added a nonRentrant modifier to the `PuppyRaffle::refund` function.
  2. Consider updating the internal state (balances) before an  external calls .This follows the Checks,Effects and Interactins(CEI) pattern. This has been shown below
-   ``` diff
+   
+```diff
     function refund(uint256 playerIndex) public {
         address playerAddress = players[playerIndex];
         require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
@@ -39,7 +40,7 @@ Also there is no  reentrancy guard in the `PuppyRaffle::refund` function to prev
 -      players[playerIndex] = address(0);
 -     emit RaffleRefunded(playerAddress);
     }
-   ```
+ ```
 
 
 

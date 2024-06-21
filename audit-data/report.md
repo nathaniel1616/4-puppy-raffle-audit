@@ -1,7 +1,7 @@
 ---
 title: PuppyRaffle Audit Report
 author: Nathaniel Yeboah
-date: June 20, 2024
+date: June 21, 2024
 header-includes:
   - \usepackage{titling}
   - \usepackage{graphicx}
@@ -89,9 +89,10 @@ src/PuppyRaffle.sol
   
 # Executive Summary
 
-* Add some notes about how the audit went, what was found, types of things you found *
+* We found some major vulnerabilities in the code base and were in constant communication with the developers to understand 
+  logic, code design and possible attack vector in the code
 
-* We spend about 5 hours with 1 auditors using foundry *
+* We spend about 10 days with 1 auditor using tools such as foundry, slither , aderyn 
 
 ## Issues found
  | Severity | Number of issues found |
@@ -112,7 +113,7 @@ src/PuppyRaffle.sol
 **Description:** `PuppyRaffle::refund` function sends out ether before updating the  user  balance causing a possible ReEntrancy attack. An attacker can reenter this function multiples times to receive ether till the contract balance is 0.
 Also there is no  reentrancy guard in the `PuppyRaffle::refund` function to prevent it.
 
-**Impact:** An attacker can drain all the funds in the raffle . The attacker steals all the funds deposited all users collapsing the protocol.
+**Impact:** An attacker can drain all the funds in the raffle . The attacker steals all the funds deposited by all users collapsing the protocol.
 
 **Proof of Concept:** This can be done with following
 
@@ -136,7 +137,7 @@ Also there is no  reentrancy guard in the `PuppyRaffle::refund` function to prev
 **Recommended Mitigation:** here are a few recommendations
  1. Consider adding  Openzeppelin Reentancy guard  for the `PuppyRaffle` contract. Then added a nonRentrant modifier to the `PuppyRaffle::refund` function.
  2. Consider updating the internal state (balances) before an  external calls .This follows the Checks,Effects and Interactins(CEI) pattern. This has been shown below
-   ``` diff
+```diff
     function refund(uint256 playerIndex) public {
         address playerAddress = players[playerIndex];
         require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
@@ -147,7 +148,7 @@ Also there is no  reentrancy guard in the `PuppyRaffle::refund` function to prev
 -      players[playerIndex] = address(0);
 -     emit RaffleRefunded(playerAddress);
     }
-   ```
+```
 
 
 
@@ -160,17 +161,17 @@ Also there is no  reentrancy guard in the `PuppyRaffle::refund` function to prev
   uint256 fee = (totalAmountCollected * 20) / 100;
 @>  totalFees = totalFees + uint64(fee);
 ```
-In solidity version < 0.8.0 , there is the  code here can cause an overflow leading to a reduction in the actual fees of the contract.
+In solidity version < 0.8.0 , there is the  code above can cause an overflow leading to a reduction in the  amount  `PuppyRaffle::totalFees` of  `PuppyRaffle` contract which will be redeem by the owner.
 
 
-**Impact:**  The actual fees of the `Raffle` contract will be reduced which can cause an inabilitiy to collect fees after the winner is selected.
+**Impact:**  The actual fees of the `PuppyRaffle` contract will be reduced which can cause an inabilitiy of the owner to withdraw fees after the winner is selected.
 
-**Proof of Concept:**  This max uint of uint64 is 2*64 -1 afterward solidity version < 0.8.0 overflow and start count from zero. This can occur when the the fees collected are greater than 2^64 -1 which is approximately 18.4e**18 or   18.4 ethers  . So if the protocol has a fees above 18.4 ethers the fees overflow . 
+**Proof of Concept:**  This max uint of uint64 is `2*64 -1`, afterwards solidity version < 0.8.0 overflow and start count from zero. This can occur when the the fees collected are greater than `2^64 -1` which is approximately `18.4e**18` or   `18.4 ether` . So if the protocol has a fees above 18.4 ethers the fees overflow starting the `totalFees` value from zero. 
 
 Consider the code in the test code `PuppyRaffleTest::testAuditPoC_OverFlow` function 
-We know fees is supposed to increase when the number of player increases.
+We know `totalFees` is supposed to increase when the number of player increases.
 
-1. you can set the number of players to  170, 180 ,184, 185 ,186
+1. you can set the number of players to  170, 180 ,184, 185 ,186 in  the ``testAuditPoC_OverFlow`` function for each player number
 
 ``` javascript
 function testAuditPoC_OverFlow() public {
@@ -195,12 +196,14 @@ forge test --mt testAuditPoC_OverFlow -vv
  Total fees after selecting winner with  186  players is  306511852580896768 
 ```
 
+3. In the logs above it will be observed that the `totalFees` is for 185 players is less than that of 184 players 
 
 
 
 **Recommended Mitigation:** 
 1. use sathMath or solidity version >0.8.0
 2. change the uint64  to uint256 in the code below.
+3. remove the uint64 type casting in the code.
 ```diff
 -    uint64 public totalFees = 0;
 +    uint256 public totalFees = 0;
@@ -208,10 +211,11 @@ forge test --mt testAuditPoC_OverFlow -vv
 - totalFees = totalFees + uint64(fee);
 + totalFees = totalFees + fee;       // fee in already uint256
 ```
-### [H-3] Winner cannot not receive funds after raffle when the have refunds in a raffle round
+### [H-3] Winner cannot not receive funds after raffle when there have refunds in a raffle round
 
-**Description:** Winner cannot not receive funds after raffle when the have refunds in a raffle round due the code logic of the ```PuppyRaffle``` contract
-1. The ```PupppyRaffle::refund``` function logic does not  reduce the length of the ```PuppyRaffle::players``` array but replaces it with the zero address.
+**Description:** Winner cannot not receive funds after raffle when the have refunds in a raffle round due the code logic of the ```PuppyRaffle``` contract.
+
+1. The ```PupppyRaffle::refund``` function logic does not  reduce the length of the ```PuppyRaffle::players``` array but replaces it with the `zero address`.
 
 ```javascript
  function refund(uint256 playerIndex) public {
@@ -235,13 +239,14 @@ function selectWinner() public {
     ***Code here***
 ```
 3. In case, there have been refunds , the array length will not be reduced to match the total amount of Eth of the remaining players in the raffle.
-4. This would prevent the ```PuppyRaffle::selectWinner``` calculating the prize pool correct and causing a revert in the ```PuppyRaffle::selectWinner``` function.
+4. This would prevent the ```PuppyRaffle::selectWinner``` from calculating the prize pool correct and causing a revert in the ```PuppyRaffle::selectWinner``` function.
 
 **Impact:** The winner cannot be selected and funds would be locked in the ```PuppyRaffle``` contract
 
-**Proof of Concept:**
-1. Say 6 players entered the raffle 
-2. The fifth player and sixth player separated calls for the ```PuppyRaffle::refund``` function  and has successfully refunded
+**Proof of Concept:** Consider the following .
+
+1. Say 6 players entered the raffle.
+2. The fifth player and sixth player each calls for the ```PuppyRaffle::refund``` function  and is  successfully refunded.
 3. Now the ```PuppyRaffle::players``` array length should be four instead of six. 
 4. Yet the logic of the ```PuppyRaffle::refund``` function does not reduce the length of the ```PuppyRaffle::players``` array.
 5. In case of refunds , the ```PuppyRaffle::selectWinner``` function logic is expected to pay the winner of the raffle based on the length of the ```PuppyRaffle::players``` array(which is actually four instead instead) to determine the ```PuppyRaffle::totalAmountCollected``` variable.
@@ -282,7 +287,7 @@ function selectWinner() public {
         // uint256 expectedPayout = ((entranceFee * 4) * 80 / 100);
         vm.expectRevert();
         puppyRaffle.selectWinner();
-        // assertEq(address(playerFour).balance, bala nceBefore + expectedPayout);
+        // assertEq(address(playerFour).balance, balanceBefore + expectedPayout);
     }
 ```
    </details>
@@ -297,7 +302,7 @@ function selectWinner() public {
 **Impact:** Miners and Malicious attackers can predict the winner to suit their needs.
 
 **Proof of Concept:**
-1. This code is in the test `PuppyRaffleTest::testSelectWinner` to select the winner 
+1. This code is in the test `PuppyRaffleTest::testSelectWinner` to select the winner.  
 2. Whenever is code below is run, it will always select the playerFour as the winner all the time . This is not a random . 
 ```javascript
     function testSelectWinner() public playersEntered {
@@ -313,9 +318,9 @@ function selectWinner() public {
 
 ### [H-5] Weak Random Number Generator(WRNG) in `puppyRaffle::selectWinner::rarity`
 
-**Description:** A keccak hash of msg.sender and block.difficulty doesnot generate a
+**Description:** A keccak hash of msg.sender and block.difficulty doesnot generate a random number
 
-**Impact:** this is predicatable as the previous finds 
+**Impact:** this is predicatable as the previous finding in H-4 . The attacker can predict the winner to suit their needs. 
 
 
 **Recommended Mitigation:**  Should use ChainLink VRF.The ChainLink Docs are available [here](https://docs.chain.link/vrf).
@@ -341,7 +346,7 @@ function selectWinner() public {
 </details>
 
 
-**Impact:** The gast cost for  raffle entrants wil greatly increase as more players enter the raffle .Discourgaging later users from entering, and cuasing a rush at the start of a raffle to be aone of the first enterants in the queue.An attacker can enter the raffle with a large number of players at the start which will cause a spike in gas costs , preventing others users from using garanting a win
+**Impact:** The gast cost for  raffle entrants will greatly increase as more players enter the raffle, discourgaging later users from entering, and causing a rush at the start of a raffle to be one of the first enterants in the queue. An attacker can enter the raffle with a large number of players at the start which will cause a spike in gas costs , preventing others users from using garanting a win
 
 **Proof of Concept:**  It is possible to enter the raffle with a large number of players if the attacker is well funded. Moreover legitimate users can overwhelm cause a DDoS when the array to loop become very large
 
@@ -387,8 +392,9 @@ function testAuditPoC_DoS() public {
 
 
 **Recommended Mitigation:**  Therea are few recommendations.
+
 1. Consider allowing the duplicates.Users can make new wallet addresses anyways, so a check doesnt prevent the same person from entering multiiple times in the raffle.
-2. Use a mapping instead of a list 
+2. Use a mapping instead of a list. 
 
 
 ```solidity
@@ -398,10 +404,9 @@ for (uint256 i = 0; i < players.length - 1; i++) {
 }
 ```
 
-### [M-2] `PuppyRaffle::withdraw` function should be callable by anyone which is lead manipulation by others
+### [M-2] `PuppyRaffle::withdraw` function should be callable by anyone which can lead manipulation by others
 
-**Description:**  `PuppyRaffle::withdrawal ` function should be callable by anyone which is lead manipulation by others , for instance 
-the fee address set by  the owner will might not unable to accept eth/is a wrong address . An attacker will call this function to send out the fees
+**Description:**  `PuppyRaffle::withdrawal ` function should be callable by anyone which is lead manipulation by others , for instance the fee address set by  the owner  might  unable to accept eth/is a wrong address . An attacker will call this function to send out the fees
 
 **Impact:** Anyone can call the `PuppyRaffle::withdraw` function to send out the fees which is only intended by the owner 
 
@@ -419,7 +424,7 @@ the fee address set by  the owner will might not unable to accept eth/is a wrong
 ```javascript
  require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
 ```
-With this assertion , a malicious users can push forcily push eth into the contract using self destruct , this will raise the balance of the contract to be greater than the fees , breaking the protocol
+With this assertion , a malicious user can  forcily push eth into the contract using self destruct , this will raise the balance of the contract to be greater than the fees , breaking the `===` assertion.
 
 **Impact:**  The owner will be unable to withdraw the fees even after the raffle.
 
@@ -428,22 +433,23 @@ With this assertion , a malicious users can push forcily push eth into the contr
 -    require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
 ```
 
-### [M-4] Smart Contracts who might be winner of contract may not have a `fallback` or `receive` function  to receive eth  causing the `PuppyRaffle::selectWinner` function to revert leading to inability to reset the players and start a new raffle
+### [M-4] Smart Contracts who might be winner of the raffle may not have a `fallback` or `receive` function  to receive eth  causing the `PuppyRaffle::selectWinner` function to revert leading to inability to reset the players and start a new raffle
 
 **Description:** The `PuppyRaffle::selectWinner` function is responsible for resetting the players and starting a new raffle. Howerver , if the winner of the raffle is a smart contract and rejects eth , the `PuppyRaffle::selectWinner` function will revert.Hence the raffle will not be able to restart
 
 **Impact:** Smart Contracts winners cannot receive funds , and `PuppyRaffle` contract cannot start a new raffle
 
 **Proof of Concept:** 
-1. if only smart contracts wallet enters the raffle  without a `fallback` or `receive` function
-2. the lottery ends 
-3. the `PuppyRaffle::selectWinner` function would not work as expected and the `PuppyRaffle` contract would not be able to start a new raffle
+
+1. if only smart contracts wallet enters the raffle  without a `fallback` or `receive` function.
+2. the lottery ends .
+3. the `PuppyRaffle::selectWinner` function would not work as expected and the `PuppyRaffle` contract would not be able to start a new raffle.
    
 
 **Recommended Mitigation:** 
-1. Do not allow smart contracts to enter the raffle(not recommended)
-2. Create a mapping of address to payout , so that winners can pull their funds out themselves with a new `claimPrize` function	, putting the ownes on the wineer to claim their prize (recommended)
-3. this is a pull over push preferences 
+1. Do not allow smart contracts to enter the raffle(not recommended).
+2. Create a mapping of address to payout , so that winners can pull their funds out themselves with a new `claimPrize` function	, putting the ownes on the wineer to claim their prize (recommended).
+3. this is a pull over push preferences .
 
 
 
@@ -463,7 +469,7 @@ With this assertion , a malicious users can push forcily push eth into the contr
     }
 ```
 
-**Impact:** A playeer at index 0 may incorrectly think they have not entered the raffle and attemplt to enter the raffle again, wasting gas 
+**Impact:** A playeer at index 0 may incorrectly think they have not entered the raffle and attempt to enter the raffle again, wasting gas 
 
 **Proof of Concept:**
 1. The first player might think they are not active since the `PuppyRaffle::getActivePlayerIndex` returns 0 for non-existent players according to the natspec
@@ -527,18 +533,21 @@ Check for `address(0)` when assigning values to address state variables.
 
 </details>
 
+**Recommended Mitigation:**  Add checks for `address(0)` when setting the `feeAddress` state variable
+
 
 ### [I-2] The ```PuppyRaffle::enterRaffle```  and ```PuppyRaffle::refund``` function should marked as external and not public 
 
-**Description:**   ```PuppyRaffle::enterRaffle``` function was not used internally and should be marked as `external`
+**Description:**   ```PuppyRaffle::enterRaffle``` and ```PuppyRaffle::refund``` functions were not used internally and should be marked as `external`
 
 
 **Recommended Mitigation:** 
+for  ```PuppyRaffle::enterRaffle``` function,
 ```diff
 - function enterRaffle(address[] memory newPlayers) public payable {
 + function enterRaffle(address[] memory newPlayers) external payable {
 ```
-
+for ```PuppyRaffle::refund``` function,
 ```diff
 - function refund(uint256 playerIndex) public {
 + function refund(uint256 playerIndex) external {
@@ -550,12 +559,10 @@ Check for `address(0)` when assigning values to address state variables.
 
 **Recommended Mitigation:** 
 ```diff
-+   _safeMint(winner, tokenId);
--        (bool success,) = winner.call{value: prizePool}("");
--        require(success, "PuppyRaffle: Failed to send prize pool to winner");
++       _safeMint(winner, tokenId);
+        (bool success,) = winner.call{value: prizePool}("");
+        require(success, "PuppyRaffle: Failed to send prize pool to winner");
 -       _safeMint(winner, tokenId);
-+               (bool success,) = winner.call{value: prizePool}("");
-+       require(success, "PuppyRaffle: Failed to send prize pool to winner")
 ```
 
 
@@ -619,8 +626,6 @@ function selectWinner() external {
 
 **Description:** It consumes gas to set an array variable public.
 
-**Impact:** 
-
 **Proof of Concept:**
 
 **Recommended Mitigation:**  You should set the variable to private and use a getter function to access the index of array
@@ -640,12 +645,11 @@ function selectWinner() external {
 Reading from stroage is much more expensive than reading from a constant or immutable variable.
 
 Instances:
-- ```PuppyRaffle::raffleDuration``` should be `immutable`
-- ```PuppyRaffle::commonImageUri``` should be `constant`
-- ```PuppyRaffle::rareImageUri``` should be `constant`
-- ```PuppyRaffle::legendaryImageUri``` should be `constant`
+- ```PuppyRaffle::raffleDuration``` should be `immutable`.
+- ```PuppyRaffle::commonImageUri``` should be `constant`.
+- ```PuppyRaffle::rareImageUri``` should be `constant`.
+- ```PuppyRaffle::legendaryImageUri``` should be `constant`.
   
-
 
 
 **Recommended Mitigation:** 
@@ -658,7 +662,13 @@ Instances:
 ### [G-3] ```PuppyRaffle::players.length ``` in ```PuppyRaffle::enterRaffle``` function  should use cached array length instead of referencing `length` member of the storage array.
 
 **Recommended Mitigation:**
+In the case of ```PuppyRaffle::enterRaffle``` function, it is recommended to use the array length instead of referencing the `length` member of the storage array.
 ```diff
+ function enterRaffle(address[] memory newPlayers) public payable {
+        require(msg.value == entranceFee * newPlayers.length, "PuppyRaffle: Must send enough to enter raffle");
+        for (uint256 i = 0; i < newPlayers.length; i++) {
+            players.push(newPlayers[i]);
+        }
 +  unit256 playersLength = players.length;
 
 -  for (uint256 i = 0; i < players.length - 1; i++) {
@@ -668,6 +678,6 @@ Instances:
               require(players[i] != players[j], "PuppyRaffle:        Duplicate player");
            }
        }
-
+}}}
 ```
 
