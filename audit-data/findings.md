@@ -549,8 +549,6 @@ Instances:
 
 ### [G-3] ```PuppyRaffle::players.length ``` in ```PuppyRaffle::enterRaffle``` function  should use cached array length instead of referencing `length` member of the storage array.
 
-
-
 **Recommended Mitigation:**
 ```diff
 +  unit256 playersLength = players.length;
